@@ -1,0 +1,281 @@
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "xlnx,zynq-7000";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	model = "minimal-zynq";
+
+	chosen {
+		bootargs = "console=tty0 g_serial.use_acm=1 loglevel=8 root=/dev/ram0 boot_delay=2500 rw";
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <0>;
+			clocks = <&clkc 3>;
+			clock-latency = <1000>;
+			cpu0-supply = <&regulator_vccpint>;
+			operating-points = <
+								/* kHz    uV */
+								666667 1000000
+								333334 1000000>;
+		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x03000000 0x05000000>;
+	};
+
+	fb: framebuffer@500000 {
+		compatible = "simple-framebuffer";
+		reg = <0x500000 0x7f8000>;
+
+		width = <480>;
+		height = <272>;
+		stride = <2048>;
+		format = "a8r8g8b8";
+	};
+
+	fpga_full: fpga-region {
+		compatible = "fpga-region";
+		fpga-mgr = <&devcfg>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+	};
+
+	pmu@f8891000 {
+		compatible = "arm,cortex-a9-pmu";
+		interrupts = <0 5 4>, <0 6 4>;
+		interrupt-parent = <&intc>;
+		reg = <0xf8891000 0x1000>,
+			  <0xf8893000 0x1000>;
+	};
+
+	regulator_vccpint: fixedregulator {
+		compatible = "regulator-fixed";
+		regulator-name = "VCCPINT";
+		regulator-min-microvolt = <1000000>;
+		regulator-max-microvolt = <1000000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	amba: axi {
+		bootph-all;
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		interrupt-parent = <&intc>;
+		ranges;
+
+		slcr: slcr@f8000000 {
+			bootph-all;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "xlnx,zynq-slcr", "syscon", "simple-mfd";
+			reg = <0xf8000000 0x1000>;
+			ranges;
+
+			clkc: clkc@100 {
+				bootph-all;
+				#clock-cells = <1>;
+				compatible = "xlnx,ps7-clkc";
+				fclk-enable = <0xf>;
+				clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x",
+									 "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x",
+									 "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0",
+									 "gem1", "fclk0", "fclk1", "fclk2", "fclk3",
+									 "can0", "can1", "sdio0", "sdio1", "uart0",
+									 "uart1", "spi0", "spi1", "dma", "usb0_aper",
+									 "usb1_aper", "gem0_aper", "gem1_aper",
+									 "sdio0_aper", "sdio1_aper", "spi0_aper",
+									 "spi1_aper", "can0_aper", "can1_aper",
+									 "i2c0_aper", "i2c1_aper", "uart0_aper",
+									 "uart1_aper", "gpio_aper", "lqspi_aper",
+									 "smc_aper", "swdt", "dbg_trc", "dbg_apb";
+				reg = <0x100 0x100>;
+			};
+
+			rstc: rstc@200 {
+				compatible = "xlnx,zynq-reset";
+				reg = <0x200 0x48>;
+				#reset-cells = <1>;
+				syscon = <&slcr>;
+			};
+
+			pinctrl0: pinctrl@700 {
+				compatible = "xlnx,pinctrl-zynq";
+				reg = <0x700 0x200>;
+				syscon = <&slcr>;
+			};
+		};
+
+		efuse: efuse@f800d000 {
+			compatible = "xlnx,zynq-efuse";
+			reg = <0xf800d000 0x20>;
+		};
+
+		intc: interrupt-controller@f8f01000 {
+			compatible = "arm,cortex-a9-gic";
+			#interrupt-cells = <3>;
+			interrupt-controller;
+			reg = <0xf8f01000 0x1000>,
+				  <0xf8f00100 0x100>;
+		};
+
+		global_timer: timer@f8f00200 {
+			compatible = "arm,cortex-a9-global-timer";
+			reg = <0xf8f00200 0x20>;
+			interrupts = <1 11 0x301>;
+			interrupt-parent = <&intc>;
+			clocks = <&clkc 4>;
+		};
+
+		ttc0: timer@f8001000 {
+			interrupt-parent = <&intc>;
+			interrupts = <0 10 4>, <0 11 4>, <0 12 4>;
+			compatible = "cdns,ttc";
+			clocks = <&clkc 6>;
+			reg = <0xf8001000 0x1000>;
+		};
+
+		ttc1: timer@f8002000 {
+			interrupt-parent = <&intc>;
+			interrupts = <0 37 4>, <0 38 4>, <0 39 4>;
+			compatible = "cdns,ttc";
+			clocks = <&clkc 6>;
+			reg = <0xf8002000 0x1000>;
+		};
+
+		scutimer: timer@f8f00600 {
+			bootph-all;
+			interrupt-parent = <&intc>;
+			interrupts = <1 13 0x301>;
+			compatible = "arm,cortex-a9-twd-timer";
+			reg = <0xf8f00600 0x20>;
+			clocks = <&clkc 4>;
+		};
+
+		watchdog0: watchdog@f8005000 {
+			clocks = <&clkc 45>;
+			compatible = "cdns,wdt-r1p2";
+			interrupt-parent = <&intc>;
+			interrupts = <0 9 1>;
+			reg = <0xf8005000 0x1000>;
+			timeout-sec = <10>;
+		};
+
+		gpio0: gpio@e000a000 {
+			compatible = "xlnx,zynq-gpio-1.0";
+			#gpio-cells = <2>;
+			clocks = <&clkc 42>;
+			gpio-controller;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			interrupt-parent = <&intc>;
+			interrupts = <0 20 4>;
+			reg = <0xe000a000 0x1000>;
+		};
+
+		usb0: usb@e0002000 {
+			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
+			clocks = <&clkc 28>;
+			interrupt-parent = <&intc>;
+			interrupts = <0 21 4>;
+			reg = <0xe0002000 0x1000>;
+			status = "okay";
+			dr_mode = "peripheral";
+			usb-phy = <&usb_phy0>;
+		};
+
+		usb_phy0: phy0 {
+			compatible = "usb-nop-xceiv";
+			#phy-cells = <0>;
+			reset-gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>, <&gpio0 48 GPIO_ACTIVE_HIGH>;
+			vbus-supply = <&regulator_vccpint>;
+		};
+
+		uart0: serial@e0000000 {
+			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+			status = "disabled";
+			clocks = <&clkc 23>, <&clkc 40>;
+			clock-names = "uart_clk", "pclk";
+			reg = <0xe0000000 0x1000>;
+			interrupts = <0 27 4>;
+		};
+
+		uart1: serial@e0001000 {
+			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+			status = "disabled";
+			clocks = <&clkc 24>, <&clkc 41>;
+			clock-names = "uart_clk", "pclk";
+			reg = <0xe0001000 0x1000>;
+			interrupts = <0 50 4>;
+		};
+
+		dmac_s: dma-controller@f8003000 {
+			compatible = "arm,pl330", "arm,primecell";
+			reg = <0xf8003000 0x1000>;
+			interrupt-parent = <&intc>;
+			/*
+			 * interrupt-names = "abort", "dma0", "dma1", "dma2", "dma3",
+			 * "dma4", "dma5", "dma6", "dma7";
+			 */
+			interrupts = <0 13 4>,
+						 <0 14 4>, <0 15 4>,
+						 <0 16 4>, <0 17 4>,
+						 <0 40 4>, <0 41 4>,
+						 <0 42 4>, <0 43 4>;
+			#dma-cells = <1>;
+			clocks = <&clkc 27>;
+			clock-names = "apb_pclk";
+		};
+
+		L2: cache-controller@f8f02000 {
+			compatible = "arm,pl310-cache";
+			reg = <0xf8f02000 0x1000>;
+			interrupts = <0 2 4>;
+			arm,data-latency = <3 2 2>;
+			arm,tag-latency = <2 2 2>;
+			cache-unified;
+			cache-level = <2>;
+		};
+
+		mc: memory-controller@f8006000 {
+			compatible = "xlnx,zynq-ddrc-a05";
+			reg = <0xf8006000 0x1000>;
+		};
+
+		ocm: sram@fffc0000 {
+			compatible = "mmio-sram";
+			reg = <0xfffc0000 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 0xfffc0000 0x10000>;
+
+			ocm-sram@0 {
+				reg = <0x0 0x10000>;
+			};
+		};
+
+		devcfg: devcfg@f8007000 {
+			compatible = "xlnx,zynq-devcfg-1.0";
+			reg = <0xf8007000 0x100>;
+			interrupt-parent = <&intc>;
+			interrupts = <0 8 4>;
+			clocks = <&clkc 12>, <&clkc 15>, <&clkc 16>, <&clkc 17>, <&clkc 18>;
+			clock-names = "ref_clk", "fclk0", "fclk1", "fclk2", "fclk3";
+			syscon = <&slcr>;
+		};
+	};
+};

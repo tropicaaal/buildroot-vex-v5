@@ -1,0 +1,8 @@
+config BR2_PACKAGE_FASTFETCH
+	bool "fastfetch"
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  A fast, feature-rich system information tool.
+
+	  https://github.com/fastfetch-cli/fastfetch

@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_VEX_V5_PATH/package/fastfetch/Config.in"
