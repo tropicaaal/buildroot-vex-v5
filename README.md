@@ -1,6 +1,6 @@
 # buildroot-vex-v5
 
-Buildroot `BR2_EXTERNAL` tree for building Linux targeting the VEX V5 Brain.
+Buildroot `BR2_EXTERNAL` tree for building Linux targeting the VEX V5 Brain. This outputs bootable images for the [valenki bootloader](https://github.com/tropicaaal/valenki) (kept private at the moment).
 
 for menuconfig:
 
