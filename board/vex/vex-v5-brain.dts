@@ -1,6 +1,7 @@
 /dts-v1/;
 
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 
 / {
 	compatible = "xlnx,zynq-7000";
@@ -35,16 +36,6 @@
 		reg = <0x01000000 0x07000000>;
 	};
 
-	fb: framebuffer@500000 {
-		compatible = "simple-framebuffer";
-		reg = <0x500000 0x7f8000>;
-
-		width = <480>;
-		height = <240>;
-		stride = <2048>;
-		format = "a8r8g8b8";
-	};
-
 	fpga_full: fpga-region {
 		compatible = "fpga-region";
 		fpga-mgr = <&devcfg>;
@@ -55,8 +46,8 @@
 
 	pmu@f8891000 {
 		compatible = "arm,cortex-a9-pmu";
-		interrupts = <0 5 4>, <0 6 4>;
-		interrupt-parent = <&intc>;
+		interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>, <0 6 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-parent = <&gic>;
 		reg = <0xf8891000 0x1000>,
 			  <0xf8893000 0x1000>;
 	};
@@ -75,7 +66,7 @@
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		interrupt-parent = <&intc>;
+		interrupt-parent = <&gic>;
 		ranges;
 
 		slcr: slcr@f8000000 {
@@ -125,33 +116,134 @@
 			reg = <0xf800d000 0x20>;
 		};
 
-		intc: interrupt-controller@f8f01000 {
+		gic: interrupt-controller@f8f01000 {
 			compatible = "arm,cortex-a9-gic";
 			#interrupt-cells = <3>;
 			interrupt-controller;
 			reg = <0xf8f01000 0x1000>,
-			      <0xf8f00100 0x100>;
+				  <0xf8f00100 0x100>;
+		};
+
+		intc0: interrupt-controller@41800000 {
+			compatible = "xlnx,xps-intc-1.00.a";
+			reg = <0x41800000 0x10000>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+
+			interrupt-parent = <&gic>;
+			// PPI 31 (- 16)
+			interrupts = <1 15 IRQ_TYPE_LEVEL_HIGH>;
+
+			// 21 XUartLites, 1 XTmrCtr, some touchscreen peripheral are the known ones, but evidently there are more
+			xlnx,num-intr-inputs = <27>; // 24 for INTC 1
+			// XIntc[0].Config.AckBeforeService & 0x7FFFFFF = 0x0
+			xlnx,kind-of-intr = <0x0>;
+		};
+
+		logicvc_vclk: logicvc-vclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			// PixelClock=9009
+			clock-frequency = <9009000>;
+		};
+
+		logicvc: logicvc@43c00000 {
+			compatible = "xylon,logicvc-4.01.c", "syscon", "simple-mfd";
+			reg = <0x43c00000 0x6000>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			logicvc_display: display@0 {
+				compatible = "xylon,logicvc-4.01.a-display";
+				reg = <0x0 0x6000>;
+
+				clocks = <&logicvc_vclk>;
+				clock-names = "vclk";
+
+				interrupt-parent = <&intc0>;
+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
+
+				xylon,display-interface = "parallel-rgb";
+				xylon,display-colorspace = "rgb";
+				xylon,display-depth = <24>;
+				xylon,row-stride = <512>;
+
+				layers {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					layer@0 {
+						reg = <0>;
+						xylon,layer-depth = <24>;
+						xylon,layer-colorspace = "rgb";
+						xylon,layer-alpha-mode = "layer";
+						xylon,layer-primary;
+					};
+				};
+
+				port {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					logicvc_output: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&panel_input>;
+					};
+				};
+			};
+		};
+
+		panel: panel {
+			compatible = "vex,v5-display-panel", "panel-dpi";
+
+			panel-timing {
+				clock-frequency = <9009000>;
+				hactive = <480>;
+				vactive = <272>;
+				hsync-len = <41>;
+				hfront-porch = <2>;
+				hback-porch = <2>;
+				vsync-len = <10>;
+				vfront-porch = <2>;
+				vback-porch = <2>;
+
+				// these are best-effort guesses
+				hsync-active = <1>;
+				vsync-active = <1>;
+				de-active = <1>;
+				pixelclk-active = <0>;
+			};
+
+			port {
+				panel_input: endpoint {
+					remote-endpoint = <&logicvc_output>;
+				};
+			};
 		};
 
 		global_timer: timer@f8f00200 {
 			compatible = "arm,cortex-a9-global-timer";
 			reg = <0xf8f00200 0x20>;
 			interrupts = <1 11 0x301>;
-			interrupt-parent = <&intc>;
+			interrupt-parent = <&gic>;
 			clocks = <&clkc 4>;
 		};
 
 		ttc0: timer@f8001000 {
-			interrupt-parent = <&intc>;
-			interrupts = <0 10 4>, <0 11 4>, <0 12 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>, <0 11 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 12 IRQ_TYPE_LEVEL_HIGH>;
 			compatible = "cdns,ttc";
 			clocks = <&clkc 6>;
 			reg = <0xf8001000 0x1000>;
 		};
 
 		ttc1: timer@f8002000 {
-			interrupt-parent = <&intc>;
-			interrupts = <0 37 4>, <0 38 4>, <0 39 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 37 IRQ_TYPE_LEVEL_HIGH>, <0 38 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 39 IRQ_TYPE_LEVEL_HIGH>;
 			compatible = "cdns,ttc";
 			clocks = <&clkc 6>;
 			reg = <0xf8002000 0x1000>;
@@ -159,7 +251,7 @@
 
 		scutimer: timer@f8f00600 {
 			bootph-all;
-			interrupt-parent = <&intc>;
+			interrupt-parent = <&gic>;
 			interrupts = <1 13 0x301>; /* GIC id 29 */
 			compatible = "arm,cortex-a9-twd-timer";
 			reg = <0xf8f00600 0x20>;
@@ -169,7 +261,7 @@
 		watchdog0: watchdog@f8005000 {
 			clocks = <&clkc 45>;
 			compatible = "cdns,wdt-r1p2";
-			interrupt-parent = <&intc>;
+			interrupt-parent = <&gic>;
 			interrupts = <0 9 1>;
 			reg = <0xf8005000 0x1000>;
 			timeout-sec = <10>;
@@ -182,16 +274,16 @@
 			gpio-controller;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 20 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 20 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xe000a000 0x1000>;
 		};
 
 		usb0: usb@e0002000 {
 			compatible = "xlnx,zynq-usb-2.20a", "chipidea,usb2";
 			clocks = <&clkc 28>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 21 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xe0002000 0x1000>;
 			status = "okay";
 			dr_mode = "peripheral";
@@ -210,8 +302,8 @@
 			status = "okay";
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&clkc 21>, <&clkc 32>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 24 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xe0100000 0x1000>;
 		};
 
@@ -221,7 +313,7 @@
 			clocks = <&clkc 23>, <&clkc 40>;
 			clock-names = "uart_clk", "pclk";
 			reg = <0xe0000000 0x1000>;
-			interrupts = <0 27 4>;
+			interrupts = <0 27 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		uart1: serial@e0001000 {
@@ -230,22 +322,22 @@
 			clocks = <&clkc 24>, <&clkc 41>;
 			clock-names = "uart_clk", "pclk";
 			reg = <0xe0001000 0x1000>;
-			interrupts = <0 50 4>;
+			interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		dmac_s: dma-controller@f8003000 {
 			compatible = "arm,pl330", "arm,primecell";
 			reg = <0xf8003000 0x1000>;
-			interrupt-parent = <&intc>;
+			interrupt-parent = <&gic>;
 			/*
 			 * interrupt-names = "abort", "dma0", "dma1", "dma2", "dma3",
 			 * "dma4", "dma5", "dma6", "dma7";
 			 */
-			interrupts = <0 13 4>,
-						 <0 14 4>, <0 15 4>,
-						 <0 16 4>, <0 17 4>,
-						 <0 40 4>, <0 41 4>,
-						 <0 42 4>, <0 43 4>;
+			interrupts = <0 13 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 14 IRQ_TYPE_LEVEL_HIGH>, <0 15 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 16 IRQ_TYPE_LEVEL_HIGH>, <0 17 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 40 IRQ_TYPE_LEVEL_HIGH>, <0 41 IRQ_TYPE_LEVEL_HIGH>,
+						 <0 42 IRQ_TYPE_LEVEL_HIGH>, <0 43 IRQ_TYPE_LEVEL_HIGH>;
 			#dma-cells = <1>;
 			clocks = <&clkc 27>;
 			clock-names = "apb_pclk";
@@ -281,8 +373,8 @@
 		devcfg: devcfg@f8007000 {
 			compatible = "xlnx,zynq-devcfg-1.0";
 			reg = <0xf8007000 0x100>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 8 4>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clkc 12>, <&clkc 15>, <&clkc 16>, <&clkc 17>, <&clkc 18>;
 			clock-names = "ref_clk", "fclk0", "fclk1", "fclk2", "fclk3";
 			syscon = <&slcr>;

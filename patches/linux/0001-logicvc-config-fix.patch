@@ -1,0 +1,30 @@
+diff --git a/drivers/gpu/drm/logicvc/logicvc_of.c b/drivers/gpu/drm/logicvc/logicvc_of.c
+index e068773..d7890a2 100644
+--- a/drivers/gpu/drm/logicvc/logicvc_of.c
++++ b/drivers/gpu/drm/logicvc/logicvc_of.c
+@@ -11,8 +11,11 @@
+ #include "logicvc_of.h"
+ 
+ static struct logicvc_of_property_sv logicvc_of_display_interface_sv[] = {
+-	{ "lvds-4bits",	LOGICVC_DISPLAY_INTERFACE_LVDS_4BITS },
+-	{ "lvds-3bits",	LOGICVC_DISPLAY_INTERFACE_LVDS_3BITS },
++	{ "parallel-rgb", LOGICVC_DISPLAY_INTERFACE_RGB },
++	{ "bt656",        LOGICVC_DISPLAY_INTERFACE_ITU656 },
++	{ "lvds-4bits",	  LOGICVC_DISPLAY_INTERFACE_LVDS_4BITS },
++	{ "lvds-3bits",	  LOGICVC_DISPLAY_INTERFACE_LVDS_3BITS },
++	{ "dvi",	      LOGICVC_DISPLAY_INTERFACE_DVI },
+ 	{ },
+ };
+ 
+@@ -40,8 +43,8 @@ static struct logicvc_of_property logicvc_of_properties[] = {
+ 		.name		= "xylon,display-interface",
+ 		.sv		= logicvc_of_display_interface_sv,
+ 		.range		= {
+-			LOGICVC_DISPLAY_INTERFACE_LVDS_4BITS,
+-			LOGICVC_DISPLAY_INTERFACE_LVDS_3BITS,
++			LOGICVC_DISPLAY_INTERFACE_RGB,
++			LOGICVC_DISPLAY_INTERFACE_DVI,
+ 		},
+ 	},
+ 	[LOGICVC_OF_PROPERTY_DISPLAY_COLORSPACE] = {
+
