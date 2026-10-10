@@ -1,7 +1,25 @@
 diff --git a/drivers/gpu/drm/logicvc/logicvc_crtc.c b/drivers/gpu/drm/logicvc/logicvc_crtc.c
-index 43a675d..0a59665 100644
+index 43a675d..6a71946 100644
 --- a/drivers/gpu/drm/logicvc/logicvc_crtc.c
 +++ b/drivers/gpu/drm/logicvc/logicvc_crtc.c
+@@ -48,7 +48,7 @@ static void logicvc_crtc_atomic_begin(struct drm_crtc *drm_crtc,
+ 	 * We need to grab the pending event here if vblank was already enabled
+ 	 * since we won't get a call to atomic_enable to grab it.
+ 	 */
+-	if (drm_crtc->state->event && old_state->active) {
++	if (drm_crtc->state->event && old_state->active && !drm_crtc->state->no_vblank) {
+ 		spin_lock_irqsave(&drm_dev->event_lock, flags);
+ 		WARN_ON(drm_crtc_vblank_get(drm_crtc) != 0);
+ 
+@@ -139,7 +139,7 @@ static void logicvc_crtc_atomic_enable(struct drm_crtc *drm_crtc,
+ 	drm_crtc_vblank_on(drm_crtc);
+ 
+ 	/* Register our event after vblank is enabled. */
+-	if (drm_crtc->state->event && !old_state->active) {
++	if (drm_crtc->state->event && !old_state->active && !drm_crtc->state->no_vblank) {
+ 		spin_lock_irqsave(&drm_dev->event_lock, flags);
+ 		WARN_ON(drm_crtc_vblank_get(drm_crtc) != 0);
+ 
 @@ -181,11 +181,23 @@ static void logicvc_crtc_atomic_disable(struct drm_crtc *drm_crtc,
  	}
  }
