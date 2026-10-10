@@ -1,0 +1,28 @@
+diff --git a/drivers/gpu/drm/logicvc/logicvc_crtc.c b/drivers/gpu/drm/logicvc/logicvc_crtc.c
+index 43a675d..0a59665 100644
+--- a/drivers/gpu/drm/logicvc/logicvc_crtc.c
++++ b/drivers/gpu/drm/logicvc/logicvc_crtc.c
+@@ -181,11 +181,23 @@ static void logicvc_crtc_atomic_disable(struct drm_crtc *drm_crtc,
+ 	}
+ }
+ 
++static int logicvc_crtc_atomic_check(struct drm_crtc *drm_crtc,
++				      struct drm_atomic_state *state)
++{
++	struct drm_crtc_state *crtc_state =
++		drm_atomic_get_new_crtc_state(state, drm_crtc);
++
++	crtc_state->no_vblank = true;
++
++	return 0;
++}
++
+ static const struct drm_crtc_helper_funcs logicvc_crtc_helper_funcs = {
+ 	.mode_valid		= logicvc_crtc_mode_valid,
+ 	.atomic_begin		= logicvc_crtc_atomic_begin,
+ 	.atomic_enable		= logicvc_crtc_atomic_enable,
+ 	.atomic_disable		= logicvc_crtc_atomic_disable,
++	.atomic_check       = logicvc_crtc_atomic_check,
+ };
+ 
+ static int logicvc_crtc_enable_vblank(struct drm_crtc *drm_crtc)
