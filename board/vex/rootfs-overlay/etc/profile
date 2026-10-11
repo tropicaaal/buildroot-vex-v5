@@ -1,3 +1,6 @@
 if [ "$(tty)" = "/dev/tty0" ]; then
+    mkdir /dev/pts
+    mount -t devpts none /dev/pts
     fastfetch
 fi
+
